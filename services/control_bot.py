@@ -1,40 +1,83 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-)
-from config import BOT_TOKEN, OWNER_ID, WEBHOOK_URL
-import os
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from config import BOT_TOKEN, OWNER_ID
 
-# -------------------------
-# START COMMAND
-# -------------------------
+app = Application.builder().token(BOT_TOKEN).build()
+
+
+# ---------- ACCESS CHECK ----------
+
+def is_owner(user_id: int):
+    return user_id == OWNER_ID
+
+
+# ---------- START PANEL ----------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
 
-    if user_id != OWNER_ID:
+    user = update.effective_user
+
+    if not is_owner(user.id):
         await update.message.reply_text("❌ Access denied")
         return
 
     keyboard = [
-        [InlineKeyboardButton("📊 Status", callback_data="status")],
-        [InlineKeyboardButton("⚡ Restart", callback_data="restart")],
-        [InlineKeyboardButton("🧠 System Info", callback_data="sysinfo")]
+        [InlineKeyboardButton("📂 Files", callback_data="files")],
+        [InlineKeyboardButton("📊 Stats", callback_data="stats")],
+        [InlineKeyboardButton("▶ Start Bots", callback_data="startbots")],
+        [InlineKeyboardButton("⏹ Stop Bots", callback_data="stopbots")],
+        [InlineKeyboardButton("⚙ Settings", callback_data="settings")]
     ]
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text(
-        "✅ Hosting Panel Online\n\nSelect an option:",
-        reply_markup=reply_markup
+        "🔥 *Hosting Control Panel*\n\nSelect an option:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
     )
 
 
-# -------------------------
-# BUTTON HANDLER
+# ---------- BUTTON HANDLER ----------
+
+async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    if not is_owner(query.from_user.id):
+        await query.edit_message_text("❌ Access denied")
+        return
+
+    data = query.data
+
+    if data == "files":
+        await query.edit_message_text("📂 No files uploaded yet")
+
+    elif data == "stats":
+        await query.edit_message_text(
+            "📊 *System Stats*\n\nCPU: Normal\nRAM: Normal\nRunning Bots: 1/10",
+            parse_mode="Markdown"
+        )
+
+    elif data == "startbots":
+        await query.edit_message_text("▶ Bots started successfully")
+
+    elif data == "stopbots":
+        await query.edit_message_text("⏹ Bots stopped successfully")
+
+    elif data == "settings":
+        await query.edit_message_text("⚙ Settings panel (coming soon)")
+
+
+# ---------- REGISTER ----------
+
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CallbackQueryHandler(buttons))
+
+
+# ---------- EXPORT FOR MAIN ----------
+
+def get_bot_app():
+    return app# BUTTON HANDLER
 # -------------------------
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
