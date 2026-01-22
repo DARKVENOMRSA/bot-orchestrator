@@ -1,4 +1,4 @@
-from services.control_bot import start_bot_panel
+from services.control_bot import start_panel
 
-print("System Ready")
-start_bot_panel()
+if __name__ == "__main__":
+    start_panel()
