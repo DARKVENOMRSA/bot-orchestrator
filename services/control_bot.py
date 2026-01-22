@@ -1,40 +1,67 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import os
+import psutil
 
-from core.registry import add_bot, list_bots
-from core.runner import start_bot, stop_bot
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
+
+# ===== ENV =====
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-OWNER_ID = int(os.getenv("OWNER_ID"))
 
-BOT_FOLDER = "bots"
-os.makedirs(BOT_FOLDER, exist_ok=True)
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN not set in Railway variables")
 
+# ===== BASIC COMMANDS =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if update.effective_user.id != OWNER_ID:
-        return
-
     await update.message.reply_text(
-        "🤖 Bot Orchestrator Panel\n\n"
-        "/bots - list bots\n"
-        "/run bot.py\n"
-        "/stop bot.py\n"
-        "Upload .py or .js files"
+        "🤖 Bot Hosting Panel Online\n\n"
+        "/ping - Test bot\n"
+        "/status - CPU/RAM usage\n"
     )
 
 
-async def bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🏓 Pong — Panel Alive")
 
-    if update.effective_user.id != OWNER_ID:
-        return
 
-    data = list_bots()
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cpu = psutil.cpu_percent(interval=1)
+    ram = psutil.virtual_memory().percent
 
-    if not data:
-        await update.message.reply_text("No bots registered")
+    await update.message.reply_text(
+        f"📊 Server Status\n\n"
+        f"CPU: {cpu}%\n"
+        f"RAM: {ram}%"
+    )
+
+
+async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("📥 Upload system ready (hosting module coming next)")
+
+
+# ===== BOT START =====
+
+def start_bot_panel():
+
+    print("⚡ Starting Telegram Control Panel")
+
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("ping", ping))
+    app.add_handler(CommandHandler("status", status))
+    app.add_handler(MessageHandler(filters.Document.ALL, upload))
+
+    print("✅ Control Panel Online")
+
+    app.run_polling(drop_pending_updates=True)        await update.message.reply_text("No bots registered")
         return
 
     msg = ""
