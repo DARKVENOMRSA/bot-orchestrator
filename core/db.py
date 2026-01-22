@@ -3,25 +3,37 @@ import os
 
 os.makedirs("data", exist_ok=True)
 
-DB_FILE = "data/system.db"
+DB = "data/manager.db"
+
 
 def connect():
-    return sqlite3.connect(DB_FILE, check_same_thread=False)
+    return sqlite3.connect(DB, check_same_thread=False)
+
 
 def init_db():
-    conn = connect()
-    cur = conn.cursor()
+    con = connect()
+    cur = con.cursor()
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS bots (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE,
-        file TEXT,
-        status TEXT,
+    CREATE TABLE IF NOT EXISTS bots(
+        name TEXT PRIMARY KEY,
+        path TEXT,
         pid INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        status TEXT,
+        last_error TEXT
     )
     """)
 
-    conn.commit()
-    conn.close()
+    con.commit()
+    con.close()
+
+
+def get_all_bots():
+    con = connect()
+    cur = con.cursor()
+
+    cur.execute("SELECT name, path, status FROM bots")
+    data = cur.fetchall()
+
+    con.close()
+    return data
