@@ -1,5 +1,6 @@
 import os
-import psutil
+import threading
+import time
 
 from telegram import Update
 from telegram.ext import (
@@ -10,59 +11,45 @@ from telegram.ext import (
     filters
 )
 
-# ===== ENV =====
+from core.db import init_db
+from core.runner import (
+    register_bot,
+    list_bots,
+    start_bot,
+    stop_bot,
+    watchdog,
+    restore_bots
+)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN not set in Railway variables")
+    raise RuntimeError("BOT_TOKEN missing")
 
-# ===== BASIC COMMANDS =====
+BOT_DIR = "bots"
+os.makedirs(BOT_DIR, exist_ok=True)
+
+MAX_BOTS = 10
+
+
+# ===== TELEGRAM COMMANDS =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 Bot Hosting Panel Online\n\n"
-        "/ping - Test bot\n"
-        "/status - CPU/RAM usage\n"
+        "🤖 Hosting Panel Online\n\n"
+        "/bots\n"
+        "/run bot.py\n"
+        "/stop bot.py\n"
+        "Upload .py or .js"
     )
 
 
-async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🏓 Pong — Panel Alive")
+async def bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    data = list_bots()
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cpu = psutil.cpu_percent(interval=1)
-    ram = psutil.virtual_memory().percent
-
-    await update.message.reply_text(
-        f"📊 Server Status\n\n"
-        f"CPU: {cpu}%\n"
-        f"RAM: {ram}%"
-    )
-
-
-async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📥 Upload system ready (hosting module coming next)")
-
-
-# ===== BOT START =====
-
-def start_bot_panel():
-
-    print("⚡ Starting Telegram Control Panel")
-
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("ping", ping))
-    app.add_handler(CommandHandler("status", status))
-    app.add_handler(MessageHandler(filters.Document.ALL, upload))
-
-    print("✅ Control Panel Online")
-
-    app.run_polling(drop_pending_updates=True)        await update.message.reply_text("No bots registered")
-        return
+    if not data:
+        return await update.message.reply_text("No bots registered")
 
     msg = ""
     for b in data:
@@ -73,38 +60,30 @@ def start_bot_panel():
 
 async def run(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if update.effective_user.id != OWNER_ID:
-        return
-
     if not context.args:
         return await update.message.reply_text("Usage: /run bot.py")
 
     name = context.args[0]
+    path = f"{BOT_DIR}/{name}"
 
-    ok = start_bot(name, f"{BOT_FOLDER}/{name}")
+    ok, msg = start_bot(name, path)
 
-    await update.message.reply_text("Started ✅" if ok else "Failed ❌")
+    await update.message.reply_text(msg)
 
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if update.effective_user.id != OWNER_ID:
-        return
 
     if not context.args:
         return await update.message.reply_text("Usage: /stop bot.py")
 
     name = context.args[0]
 
-    ok = stop_bot(name)
+    ok, msg = stop_bot(name)
 
-    await update.message.reply_text("Stopped ✅" if ok else "Failed ❌")
+    await update.message.reply_text(msg)
 
 
 async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if update.effective_user.id != OWNER_ID:
-        return
 
     doc = update.message.document
 
@@ -116,17 +95,41 @@ async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not name.endswith((".py", ".js")):
         return await update.message.reply_text("Only .py or .js allowed")
 
+    if len(list_bots()) >= MAX_BOTS:
+        return await update.message.reply_text("Bot limit reached (10)")
+
     file = await doc.get_file()
-    path = f"{BOT_FOLDER}/{name}"
+    path = f"{BOT_DIR}/{name}"
 
     await file.download_to_drive(path)
 
-    add_bot(name, path)
+    register_bot(name, path)
 
-    await update.message.reply_text(f"✅ Registered: {name}")
+    await update.message.reply_text(f"✅ Registered {name}")
 
+
+# ===== BACKGROUND WATCHDOG THREAD =====
+
+def watchdog_loop():
+    while True:
+        watchdog()
+        time.sleep(5)
+
+
+# ===== START PANEL =====
 
 def start_bot_panel():
+
+    print("⚡ Booting Hosting Engine")
+
+    init_db()
+
+    # Restore previous running bots
+    restore_bots()
+
+    # Start watchdog thread
+    t = threading.Thread(target=watchdog_loop, daemon=True)
+    t.start()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -136,6 +139,6 @@ def start_bot_panel():
     app.add_handler(CommandHandler("stop", stop))
     app.add_handler(MessageHandler(filters.Document.ALL, upload))
 
-    print("🚀 Control Panel Online")
+    print("✅ Hosting Engine Online")
 
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
