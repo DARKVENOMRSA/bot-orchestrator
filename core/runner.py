@@ -1,11 +1,12 @@
 import subprocess
 import psutil
+import os
 from core.db import connect
 
 processes = {}
 
-MAX_RAM = 300   # MB per bot
-MAX_CPU = 60    # % per bot
+MAX_RAM = 300   # MB
+MAX_CPU = 60    # %
 
 
 def register_bot(name, path):
@@ -34,6 +35,9 @@ def list_bots():
 
 def start_bot(name, path):
 
+    if not os.path.exists(path):
+        return False, "File missing"
+
     if name in processes:
         return False, "Already running"
 
@@ -44,7 +48,7 @@ def start_bot(name, path):
         proc = subprocess.Popen(["node", path])
 
     else:
-        return False, "Unsupported file"
+        return False, "Unsupported"
 
     processes[name] = proc
 
@@ -67,10 +71,8 @@ def stop_bot(name):
     if name not in processes:
         return False, "Not running"
 
-    proc = processes[name]
-
     try:
-        psutil.Process(proc.pid).kill()
+        psutil.Process(processes[name].pid).kill()
     except:
         pass
 
@@ -90,27 +92,27 @@ def stop_bot(name):
     return True, "Stopped"
 
 
-# ===== AUTO RESTORE FUNCTION =====
+# ===== SAFE RESTORE =====
 
 def restore_bots():
 
-    print("♻ Restoring previous bots...")
+    print("♻ Restoring bots...")
 
     con = connect()
     cur = con.cursor()
 
-    cur.execute("SELECT name, path FROM bots WHERE status='running'")
+    cur.execute("SELECT name,path FROM bots WHERE status='running'")
     bots = cur.fetchall()
 
     con.close()
 
     for name, path in bots:
-        try:
-            ok, _ = start_bot(name, path)
-            if ok:
-                print(f"✅ Restored {name}")
-        except:
-            print(f"❌ Failed restore {name}")
+
+        if not os.path.exists(path):
+            print(f"⚠ Skipped missing file: {name}")
+            continue
+
+        start_bot(name, path)
 
 
 # ===== WATCHDOG =====
@@ -141,7 +143,7 @@ def watchdog():
                 con.commit()
                 con.close()
 
-                print(f"⚠ {name} killed (resource limit)")
+                print(f"⚠ {name} killed (limit)")
 
         except:
             pass
