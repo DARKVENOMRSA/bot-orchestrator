@@ -32,7 +32,7 @@ os.makedirs(BOT_DIR, exist_ok=True)
 MAX_BOTS = 10
 
 
-# ===== TELEGRAM COMMANDS =====
+# ===== COMMANDS =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -49,7 +49,8 @@ async def bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = list_bots()
 
     if not data:
-        return await update.message.reply_text("No bots registered")
+        await update.message.reply_text("No bots registered")
+        return
 
     msg = ""
     for b in data:
@@ -61,7 +62,8 @@ async def bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def run(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not context.args:
-        return await update.message.reply_text("Usage: /run bot.py")
+        await update.message.reply_text("Usage: /run bot.py")
+        return
 
     name = context.args[0]
     path = f"{BOT_DIR}/{name}"
@@ -74,7 +76,8 @@ async def run(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not context.args:
-        return await update.message.reply_text("Usage: /stop bot.py")
+        await update.message.reply_text("Usage: /stop bot.py")
+        return
 
     name = context.args[0]
 
@@ -93,10 +96,12 @@ async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = doc.file_name
 
     if not name.endswith((".py", ".js")):
-        return await update.message.reply_text("Only .py or .js allowed")
+        await update.message.reply_text("Only .py or .js allowed")
+        return
 
     if len(list_bots()) >= MAX_BOTS:
-        return await update.message.reply_text("Bot limit reached (10)")
+        await update.message.reply_text("Bot limit reached")
+        return
 
     file = await doc.get_file()
     path = f"{BOT_DIR}/{name}"
@@ -108,7 +113,7 @@ async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Registered {name}")
 
 
-# ===== BACKGROUND WATCHDOG THREAD =====
+# ===== WATCHDOG THREAD =====
 
 def watchdog_loop():
     while True:
@@ -116,7 +121,7 @@ def watchdog_loop():
         time.sleep(5)
 
 
-# ===== START PANEL =====
+# ===== START =====
 
 def start_bot_panel():
 
@@ -124,8 +129,21 @@ def start_bot_panel():
 
     init_db()
 
-    # Restore previous running bots
     restore_bots()
+
+    threading.Thread(target=watchdog_loop, daemon=True).start()
+
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("bots", bots))
+    app.add_handler(CommandHandler("run", run))
+    app.add_handler(CommandHandler("stop", stop))
+    app.add_handler(MessageHandler(filters.Document.ALL, upload))
+
+    print("✅ Hosting Engine Online")
+
+    app.run_polling(drop_pending_updates=True)    restore_bots()
 
     # Start watchdog thread
     t = threading.Thread(target=watchdog_loop, daemon=True)
