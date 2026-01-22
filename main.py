@@ -1,6 +1,7 @@
-print("Bot Orchestrator Core Started")
+from core.db import init_db
+from services.control_bot import start_bot_panel
 
-import time
+init_db()
+print("System Ready")
 
-while True:
-    time.sleep(10)
+start_bot_panel()
