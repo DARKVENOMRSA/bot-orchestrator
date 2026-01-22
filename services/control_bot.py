@@ -113,7 +113,7 @@ async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Registered {name}")
 
 
-# ===== WATCHDOG THREAD =====
+# ===== WATCHDOG =====
 
 def watchdog_loop():
     while True:
@@ -132,22 +132,6 @@ def start_bot_panel():
     restore_bots()
 
     threading.Thread(target=watchdog_loop, daemon=True).start()
-
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("bots", bots))
-    app.add_handler(CommandHandler("run", run))
-    app.add_handler(CommandHandler("stop", stop))
-    app.add_handler(MessageHandler(filters.Document.ALL, upload))
-
-    print("✅ Hosting Engine Online")
-
-    app.run_polling(drop_pending_updates=True)    restore_bots()
-
-    # Start watchdog thread
-    t = threading.Thread(target=watchdog_loop, daemon=True)
-    t.start()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
